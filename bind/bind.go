@@ -40,6 +40,19 @@ const DefaultTTL = 300
 // BindSolver implements the webhook.Solver interface
 type BindProviderSolver struct {
 	client *kubernetes.Clientset
+
+	// The helper script we use to create and delete the ACME
+	// Challenge TXT records.
+	AcmeHelperScript string
+}
+
+// NewSolver creates a new BIND9 DNS-01 solver
+func NewSolver() *BindProviderSolver {
+	b := &BindProviderSolver{
+		AcmeHelperScript: "acme-challenge-helper.sh",
+	}
+
+	return b
 }
 
 // bindProviderConfig represents the configuration for the BIND solver.
@@ -67,10 +80,6 @@ type BindProviderConfig struct {
 	// tsigKey represents the raw TSIG key after fetching it from
 	// the secret store
 	tsigKey []byte
-
-	// The helper script we use to create and delete the ACME
-	// Challenge TXT records.
-	acmeHelperScript string
 }
 
 // dumpTSIGKey dumps the contents of the TSIG key in the given path
@@ -121,7 +130,7 @@ func (b *BindProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 
 	// Call our helper script here to create the respective TXT
 	// records as part of the DNS-01 challenge
-	cmd := exec.Command(cfg.acmeHelperScript, "create", zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
+	cmd := exec.Command(b.AcmeHelperScript, "create", zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create TXT record %s: %s", ch.ResolvedFQDN, err)
 	}
@@ -155,7 +164,7 @@ func (b *BindProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 
 	// Call our helper script here to delete the respective TXT
 	// record
-	cmd := exec.Command(cfg.acmeHelperScript, "delete", zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
+	cmd := exec.Command(b.AcmeHelperScript, "delete", zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to delete TXT record %s: %s", ch.ResolvedFQDN, err)
 	}
@@ -179,8 +188,7 @@ func (b *BindProviderSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-
 // the typed config struct.
 func (b *BindProviderSolver) loadConfig(cfgJSON *extapi.JSON, namespace string) (BindProviderConfig, error) {
 	cfg := BindProviderConfig{
-		TTL:              DefaultTTL,
-		acmeHelperScript: "acme-challenge-helper.sh",
+		TTL: DefaultTTL,
 	}
 
 	// We require TSIG key and allowed zones to be configured
