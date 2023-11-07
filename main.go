@@ -39,7 +39,8 @@ const DefaultTTL = 300
 
 func main() {
 	if GroupName == "" {
-		panic("GROUP_NAME must be specified")
+		fmt.Fprintf(os.Stderr, "GROUP_NAME must be specified\n")
+		os.Exit(1)
 	}
 
 	// This will register our custom DNS provider with the webhook serving
