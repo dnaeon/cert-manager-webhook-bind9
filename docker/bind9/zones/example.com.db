@@ -1,0 +1,14 @@
+$ORIGIN .
+$TTL 60	; 1 minute
+example.com		IN SOA	ns1.example.com. root.example.com. (
+				1          ; serial
+				60         ; refresh (1 minute)
+				120        ; retry (2 minutes)
+				3600       ; expire (1 hour)
+				60         ; minimum (1 minute)
+				)
+			NS	ns1.example.com.
+$ORIGIN example.com.
+foo			A	172.16.0.1
+bar			A	172.16.0.2
+ns1			A	172.16.0.3

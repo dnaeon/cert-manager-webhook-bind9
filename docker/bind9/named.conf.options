@@ -1,0 +1,11 @@
+options {
+	directory "/var/cache/bind";
+
+	recursion yes;
+
+	dnssec-validation false;
+
+	listen-on { any; };
+};
+
+include "/etc/bind/acme-tsig.key";
