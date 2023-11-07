@@ -84,13 +84,9 @@ type bindProviderConfig struct {
 	// the secret store
 	tsigKey []byte
 
-	// The helper script we use to create the ACME Challenge TXT
-	// records.
-	addTxtRecordScript string
-
-	// The helper script we use to delete the ACME Challenge TXT
-	// records.
-	deleteTxtRecordScript string
+	// The helper script we use to create and delete the ACME
+	// Challenge TXT records.
+	acmeHelperScript string
 }
 
 // dumpTSIGKey dumps the contents of the TSIG key in the given path
@@ -141,7 +137,7 @@ func (b *bindProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 
 	// Call our helper script here to create the respective TXT
 	// records as part of the DNS-01 challenge
-	cmd := exec.Command(cfg.addTxtRecordScript, zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
+	cmd := exec.Command(cfg.acmeHelperScript, "create", zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create TXT record %s: %s", ch.ResolvedFQDN, err)
 	}
@@ -175,7 +171,7 @@ func (b *bindProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 
 	// Call our helper script here to delete the respective TXT
 	// record
-	cmd := exec.Command(cfg.deleteTxtRecordScript, zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
+	cmd := exec.Command(cfg.acmeHelperScript, "delete", zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to delete TXT record %s: %s", ch.ResolvedFQDN, err)
 	}
@@ -199,9 +195,8 @@ func (b *bindProviderSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-
 // the typed config struct.
 func (b *bindProviderSolver) loadConfig(cfgJSON *extapi.JSON, namespace string) (bindProviderConfig, error) {
 	cfg := bindProviderConfig{
-		TTL:                   DefaultTTL,
-		addTxtRecordScript:    "add-acme-challenge-txt.sh",
-		deleteTxtRecordScript: "remove-acme-challenge-txt.sh",
+		TTL:              DefaultTTL,
+		acmeHelperScript: "acme-challenge-helper.sh",
 	}
 
 	// We require TSIG key and allowed zones to be configured
