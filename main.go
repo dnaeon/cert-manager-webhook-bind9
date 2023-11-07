@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"slices"
+	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -80,6 +82,30 @@ type bindProviderConfig struct {
 	// tsigKey represents the raw TSIG key after fetching it from
 	// the secret store
 	tsigKey []byte
+
+	// The helper script we use to create the ACME Challenge TXT
+	// records.
+	addTxtRecordScript string
+
+	// The helper script we use to delete the ACME Challenge TXT
+	// records.
+	deleteTxtRecordScript string
+}
+
+// dumpTSIGKey dumps the contents of the TSIG key in the given path
+// and returns the file.  Callers of this method must ensure to delete
+// the file when no longer needed.
+func (bpc *bindProviderConfig) dumpTSIGKey(path string) (*os.File, error) {
+	tmpFile, err := os.CreateTemp(path, "tsig-key")
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := tmpFile.Write(bpc.tsigKey); err != nil {
+		return nil, err
+	}
+
+	return tmpFile, nil
 }
 
 // Name implements the webhook.Solver interface
@@ -99,19 +125,60 @@ func (b *bindProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 	klog.InfoS("Solving challenge", "dnsName", ch.DNSName, "resolvedZone", ch.ResolvedZone, "resolvedFQDN", ch.ResolvedFQDN)
 
 	// The zone must be in the list of zones we are allowing
-	resolvedZone := ch.ResolvedZone
-	if !slices.Contains(cfg.AllowedZones, resolvedZone) {
-		return fmt.Errorf("Zone %s is not in the allowed-zones list", resolvedZone)
+	zoneName := ch.ResolvedZone
+	if !slices.Contains(cfg.AllowedZones, zoneName) {
+		return fmt.Errorf("Zone %s is not in the allowed-zones list", zoneName)
 	}
 
-	// TODO: Add the actual logic here
+	// Dump the TSIG key locally, so that we can pass it to
+	// the helper scripts. Make sure to delete it afterwards.
+	tsigFile, err := cfg.dumpTSIGKey("")
+	if err != nil {
+		return fmt.Errorf("failed to dump TSIG key: %s", err)
+	}
+	defer os.Remove(tsigFile.Name())
+
+	// Call our helper script here to create the respective TXT
+	// records as part of the DNS-01 challenge
+	cmd := exec.Command(cfg.addTxtRecordScript, zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to create TXT record %s: %s", ch.ResolvedFQDN, err)
+	}
+
 	return nil
 }
 
 // CleanUp implements the webhook.Solver interface and deletes the
 // respective TXT records
 func (b *bindProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
-	// TODO: Add the actual logic here
+	cfg, err := b.loadConfig(ch.Config, ch.ResourceNamespace)
+	if err != nil {
+		return err
+	}
+
+	klog.InfoS("Deleting TXT record", "dnsName", ch.DNSName, "resolvedZone", ch.ResolvedZone, "resolvedFQDN", ch.ResolvedFQDN)
+
+	// The zone must be in the list of zones we are allowing
+	zoneName := ch.ResolvedZone
+	if !slices.Contains(cfg.AllowedZones, zoneName) {
+		return fmt.Errorf("Zone %s is not in the allowed-zones list", zoneName)
+	}
+
+	// Dump the TSIG key locally, so that we can pass it to
+	// the helper scripts. Make sure to delete it afterwards.
+	tsigFile, err := cfg.dumpTSIGKey("")
+	if err != nil {
+		return fmt.Errorf("failed to dump TSIG key: %s", err)
+	}
+	defer os.Remove(tsigFile.Name())
+
+	// Call our helper script here to delete the respective TXT
+	// record
+	cmd := exec.Command(cfg.deleteTxtRecordScript, zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to delete TXT record %s: %s", ch.ResolvedFQDN, err)
+	}
+
 	return nil
 }
 
@@ -131,7 +198,9 @@ func (b *bindProviderSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-
 // the typed config struct.
 func (b *bindProviderSolver) loadConfig(cfgJSON *extapi.JSON, namespace string) (bindProviderConfig, error) {
 	cfg := bindProviderConfig{
-		TTL: DefaultTTL,
+		TTL:                   DefaultTTL,
+		addTxtRecordScript:    "add-acme-challenge-txt.sh",
+		deleteTxtRecordScript: "remove-acme-challenge-txt.sh",
 	}
 
 	// We require TSIG key and allowed zones to be configured
