@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -78,7 +79,7 @@ type bindProviderConfig struct {
 
 	// tsigKey represents the raw TSIG key after fetching it from
 	// the secret store
-	tsigKey string
+	tsigKey []byte
 }
 
 // Name implements the webhook.Solver interface
@@ -89,6 +90,7 @@ func (b *bindProviderSolver) Name() string {
 // Present implements the webhook.Solver interface by creating the
 // respective TXT records
 func (b *bindProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
+	// TODO: Handle duplicate records
 	cfg, err := b.loadConfig(ch.Config, ch.ResourceNamespace)
 	if err != nil {
 		return err
@@ -96,17 +98,20 @@ func (b *bindProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 
 	klog.InfoS("Solving challenge", "dnsName", ch.DNSName, "resolvedZone", ch.ResolvedZone, "resolvedFQDN", ch.ResolvedFQDN)
 
-	// TODO: do something more useful with the decoded configuration
-	fmt.Printf("Decoded configuration %v", cfg)
+	// The zone must be in the list of zones we are allowing
+	resolvedZone := ch.ResolvedZone
+	if !slices.Contains(cfg.AllowedZones, resolvedZone) {
+		return fmt.Errorf("Zone %s is not in the allowed-zones list", resolvedZone)
+	}
 
-	// TODO: add code that sets a record in the DNS provider's console
+	// TODO: Add the actual logic here
 	return nil
 }
 
 // CleanUp implements the webhook.Solver interface and deletes the
 // respective TXT records
 func (b *bindProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
-	// TODO: add code that deletes a record from the DNS provider's console
+	// TODO: Add the actual logic here
 	return nil
 }
 
@@ -131,7 +136,7 @@ func (b *bindProviderSolver) loadConfig(cfgJSON *extapi.JSON, namespace string) 
 
 	// We require TSIG key and allowed zones to be configured
 	if cfgJSON == nil {
-		return cfg, errors.New("TSIG key and allowedZones must be configured")
+		return cfg, errors.New("TSIG key and allowed zones must be configured")
 	}
 
 	if err := json.Unmarshal(cfgJSON.Raw, &cfg); err != nil {
@@ -166,7 +171,7 @@ func (b *bindProviderSolver) loadConfig(cfgJSON *extapi.JSON, namespace string) 
 		return cfg, fmt.Errorf("TSIG key %s not found in %s/%s", cfg.TSIGKeyRef.Key, cfg.TSIGKeyRef.LocalObjectReference.Name, namespace)
 	}
 
-	cfg.tsigKey = string(secretData)
+	cfg.tsigKey = secretData
 
 	return cfg, nil
 }
