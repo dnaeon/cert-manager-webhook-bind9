@@ -3,9 +3,9 @@ entries:
   cert-manager-webhook-bind9:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2023-11-08T09:29:26.967118184+02:00"
+    created: "2023-11-08T12:21:13.544514808+02:00"
     description: Cert Manager WebHook for BIND9 using TSIG keys
-    digest: a9e72c00ce572f1114d03b23e0eb712edb1c8c6343b343653b6dbbfbb0ddb8ba
+    digest: 1611fc7a58ed565f04a9c3cd371fe916276c2e8ef05f7a88d26b4fc09f4810f7
     home: https://github.com/dnaeon/cert-manager-webhook-bind9
     maintainers:
     - email: dnaeon@gmail.com
@@ -16,4 +16,4 @@ entries:
     urls:
     - https://dnaeon.github.io/cert-manager-webhook-bind9/cert-manager-webhook-bind9-0.1.0.tgz
     version: 0.1.0
-generated: "2023-11-08T09:29:26.966727071+02:00"
+generated: "2023-11-08T12:21:13.543595623+02:00"
