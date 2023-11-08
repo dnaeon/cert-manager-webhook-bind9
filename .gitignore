@@ -3,3 +3,4 @@
 
 # Test artifacts
 kubebuilder-tools.tar.gz
+_out/
