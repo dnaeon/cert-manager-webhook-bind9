@@ -4,8 +4,8 @@ name: cert-manager-webhook-bind9
 description: Cert Manager WebHook for BIND9 using TSIG keys
 type: application
 home: https://github.com/dnaeon/cert-manager-webhook-bind9
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.1.1
+appVersion: "0.1.1"
 maintainers:
   - name: Marin Atanasov Nikolov
     email: dnaeon@gmail.com
