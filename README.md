@@ -1,8 +1,13 @@
 # cert-manager-webhook-bind9
 
-[ACME DNS-01 Solver for Cert
-Manager](https://cert-manager.io/docs/configuration/acme/dns01/webhook/)
-using BIND as the DNS provider.
+`cert-manager-webhook-bind9` is an [ACME DNS-01 Solver for Cert
+Manager](https://cert-manager.io/docs/configuration/acme/dns01/webhook/),
+which uses BIND as the DNS provider.
+
+In order to solve ACME challenges and create the respective TXT
+records this webhook uses [TSIG
+keys](https://en.wikipedia.org/wiki/TSIG) when communicating with
+BIND.
 
 # Installation
 
