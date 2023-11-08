@@ -1,0 +1,10 @@
+{
+    "tsigKeyRef": {
+	"name": "acme-tsig-key",
+	"key": "acme-tsig.key"
+    },
+    "ttl": 60,
+    "allowedZones": [
+	"example.com."
+    ]
+}
