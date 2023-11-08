@@ -17,7 +17,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	cmd.RunWebhookServer(GroupName,
-		&bind.BindProviderSolver{},
-	)
+	solver := bind.NewSolver()
+	cmd.RunWebhookServer(GroupName, solver)
 }
