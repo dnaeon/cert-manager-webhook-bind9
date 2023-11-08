@@ -42,4 +42,8 @@ rendered-manifest.yaml:
 		cert-manager-webhook-bind9 \
 		deploy/cert-manager-webhook-bind9 > "$(OUT)/rendered-manifest.yaml"
 
-.PHONY: build docker test clean clean-kubebuilder rendered-manifest.yaml
+helm-release:
+	helm package deploy/cert-manager-webhook-bind9 -d docs/
+	helm repo index ./docs --url https://dnaeon.github.io/cert-manager-webhook-bind9
+
+.PHONY: build docker test clean clean-kubebuilder rendered-manifest.yaml helm-release
