@@ -2,7 +2,8 @@
 
 `cert-manager-webhook-bind9` is an [ACME DNS-01 Solver for Cert
 Manager](https://cert-manager.io/docs/configuration/acme/dns01/webhook/),
-which uses BIND as the DNS provider.
+which uses BIND (or any DNS server, which allows dynamic updates using
+TSIG keys) as the DNS provider.
 
 In order to solve ACME challenges and create the respective TXT
 records this webhook uses [TSIG
@@ -126,8 +127,7 @@ docker compose --file docker-compose.test.yaml up --build --remove-orphans tests
 While the tests are running you can watch the logs of the `bind9`
 service, where you should see zone update events.
 
-All tests should and you should see an output similar to the one
-below.
+You should see an output similar to the one below, if all tests pass.
 
 ``` text
 Attaching to cert-manager-webhook-bind9-tests-1
