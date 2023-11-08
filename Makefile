@@ -46,4 +46,7 @@ helm-release:
 	helm package deploy/cert-manager-webhook-bind9 -d docs/
 	helm repo index ./docs --url https://dnaeon.github.io/cert-manager-webhook-bind9
 
-.PHONY: build docker test clean clean-kubebuilder rendered-manifest.yaml helm-release
+release: docker helm-release
+	docker push "$(IMAGE_NAME):$(IMAGE_TAG)"
+
+.PHONY: build docker test clean clean-kubebuilder rendered-manifest.yaml helm-release release
