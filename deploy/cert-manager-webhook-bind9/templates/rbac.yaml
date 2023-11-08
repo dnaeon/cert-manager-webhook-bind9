@@ -89,3 +89,44 @@ subjects:
     kind: ServiceAccount
     name: {{ .Values.certManager.serviceAccountName }}
     namespace: {{ .Values.certManager.namespace }}
+---
+# Grant permissions to read secrets inside the cluster to allow to
+# have issuer in another namespace than the webhook
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cert-manager-webhook-bind9.fullname" . }}:secrets-reader
+  labels:
+    app: {{ include "cert-manager-webhook-bind9.name" . }}
+    chart: {{ include "cert-manager-webhook-bind9.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - 'secrets'
+    verbs:
+      - 'get'
+      - 'watch'
+---
+# Bind the previously created role to the webhook service account to
+# allow reading from secrets in all namespaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cert-manager-webhook-bind9.fullname" . }}:secrets-reader
+  labels:
+    app: {{ include "cert-manager-webhook-bind9.name" . }}
+    chart: {{ include "cert-manager-webhook-bind9.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cert-manager-webhook-bind9.fullname" . }}:secrets-reader
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: {{ include "cert-manager-webhook-bind9.fullname" . }}
+    namespace: {{ .Release.Namespace }}
