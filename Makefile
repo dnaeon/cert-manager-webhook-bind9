@@ -35,4 +35,11 @@ docker:
 bind9:
 	docker build -t dnaeon/bind9-test-cert-manager:latest -f docker/bind9/Dockerfile docker/bind9
 
-.PHONY: build
+rendered-manifest.yaml:
+	helm template \
+		--set image.repository=$(IMAGE_NAME) \
+		--set image.tag=$(IMAGE_TAG) \
+		cert-manager-webhook-bind9 \
+		deploy/cert-manager-webhook-bind9 > "$(OUT)/rendered-manifest.yaml"
+
+.PHONY: build docker test clean clean-kubebuilder rendered-manifest.yaml
