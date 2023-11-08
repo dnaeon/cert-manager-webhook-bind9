@@ -1,0 +1,33 @@
+---
+version: '3.9'
+services:
+  bind9:
+    build:
+      context: docker/bind9
+    ports:
+      - '1053:53/udp'
+      - '1053:53'
+    dns:
+      - 127.0.0.1
+      - 172.16.0.3
+    networks:
+      webhook_test:
+        ipv4_address: 172.16.0.3
+
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    entrypoint: ["make", "test"]
+    dns:
+      - 172.16.0.3
+    networks:
+      webhook_test:
+        ipv4_address: 172.16.0.4
+    volumes:
+      - ./docker/resolv.conf:/etc/resolv.conf
+
+networks:
+  webhook_test:
+    name: webhook_test
+    external: true
