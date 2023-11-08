@@ -11,30 +11,93 @@ BIND.
 
 # Installation
 
-TODO: Add instructions
+Install with Helm.
+
+``` bash
+helm repo add cert-manager-webhook-bind9 https://dnaeon.github.io/cert-manager-webhook-bind9
+
+helm install \
+	--namespace cert-manager \
+	cert-manager-webhook-bind9 \
+	cert-manager-webhook-bind9/cert-manager-webhook-bind9 \
+	--set groupName=acme.mydomain.tld
+```
+
+Install without Helm.
+
+``` bash
+make rendered-manifest.yaml
+kubectl apply -f _out/rendered-manifest.yaml
+```
+
+In order to uninstall the webhook execute the following command.
+
+``` bash
+helm uninstall --namespace cert-manager cert-manager-webhook-bind9
+```
 
 # Usage
 
-## Regenerate the test TSIG key
-
-In order to regenerate the test TSIG key follow these steps.
-
-First, create a new TSIG key.
+Create a TSIG key, which will be shared between the DNS-01 Solver and
+your authoritative DNS servers.
 
 ``` bash
-tsig-keygen -a hmac-sha256 acme-key  > docker/bind9/acme-tsig.key
+tsig-keygen -a hmac-sha256 acme-key > acme-tsig.key
 ```
 
-Update the test suite configuration as well.
+Create a secret for the TSIG key.
 
 ``` bash
-kubectl create secret generic acme-tsig-key \
-	--from-file docker/bind9/acme-tsig.key \
-	-o yaml \
-	--dry-run=client > testdata/cert-manager-webhook-bind9/tsig-key-secret.yaml
+kubectl --namespace cert-manager create secret generic acme-tsig.key \
+    --from-file=acme-tsig.key \
+    --dry-run=client -o yaml | kubectl --namespace cert-manager apply -f -
 ```
 
-## Certificate
+Create an `Issuer` or `ClusterIssuer`, e.g.
+
+``` yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: step-ca-issuer
+  namespace: cert-manager
+spec:
+  acme:
+    email: you@example.com
+    server: https://stepca:9000/acme/acme/directory
+    caBundle: <BASE64_CA_Bundle>
+    privateKeySecretRef:
+      name: step-ca-acme-issuer-account-key
+    solvers:
+      - dns01:
+          webhook:
+            groupName: acme.your-domain.tld
+            solverName: bind9
+            config:
+              allowedZones:
+                - zone1.your-domain.tld.
+                - zone2.your-domain.tld.
+              ttl: 300
+              tsigKeyRef:
+                name: acme-tsig.key
+                key: acme-tsig.key
+```
+
+And now request a certificate using the issuer.
+
+``` yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: test-cert-01
+  namespace: cert-manager
+spec:
+  secretName: test-cert-tls-01
+  issuerRef:
+    name: step-ca-issuer
+  dnsNames:
+    - "foo.zone1.your-domain.tld"
+```
 
 # Tests
 
@@ -99,6 +162,25 @@ cert-manager-webhook-bind9-tests-1  | PASS
 cert-manager-webhook-bind9-tests-1  | ok        github.com/dnaeon/cert-manager-webhook-bind9    10.107s
 cert-manager-webhook-bind9-tests-1 exited with code 0
 
+```
+
+## Regenerate the test TSIG key
+
+In order to regenerate the test TSIG key follow these steps.
+
+First, create a new TSIG key.
+
+``` bash
+tsig-keygen -a hmac-sha256 acme-key  > docker/bind9/acme-tsig.key
+```
+
+Update the test suite configuration as well.
+
+``` bash
+kubectl create secret generic acme-tsig-key \
+	--from-file docker/bind9/acme-tsig.key \
+	-o yaml \
+	--dry-run=client > testdata/cert-manager-webhook-bind9/tsig-key-secret.yaml
 ```
 
 # License
