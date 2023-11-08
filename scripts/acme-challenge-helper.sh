@@ -1,62 +1,74 @@
 #!/usr/bin/env bash
 #
-# A helper script which uses nsupdate(1) to create and delete TXT
-# records as part of ACME DNS-01 challenge
+# A helper script which uses nsupdate(1) to handle ACME DNS-01
+# challenges
+#
 
 set -e
 
-# Just in case it's not setup on the running environment
+# Just in case if it's not setup on the running environment
 TMPDIR=${TMPDIR:-"/tmp"}
+
+# Force DNS queries to be directed against this nameserver, instead of
+# querying the zone for the NS records.
+USE_NAMESERVER=${USE_NAMESERVER:-}
 
 _SCRIPT_NAME="${0##*/}"
 
 # Prints the usage of the sript
 function _usage() {
-    echo "${_SCRIPT_NAME} [create|delete] <zone> <tsig-key> <ttl> <token>"
+    echo "${_SCRIPT_NAME} [create|delete] <zone> <fqdn> <tsig-key> <ttl> <token>"
     exit 64  # EX_USAGE
 }
 
-# Adds a new ACME Challenge TXT record
+# Handles the ACME challenge by either creating or deleting the
+# respective DNS TXT record
 #
-# $1: Zone name
-# $2: Path to TSIG key
-# $3: TTL
-# $4: Token / Key
-function _add_acme_challenge_record() {
-    local _zone_name="${1}"
-    local _tsig_key="${2}"
-    local _ttl="${3}"
-    local _token="${4}"
-    local _script=$( mktemp delete-acme-challenge.XXXXXX )
+# $1: Operation (either create or delete)
+# $2: Zone name
+# $3: FQDN
+# $4: Path to TSIG key
+# $5: TTL
+# $6: Token / Key
+function _handle_acme_challenge() {
+    local _op="${1}"
+    local _zone_name="${2}"
+    local _fqdn="${3}"
+    local _tsig_key="${4}"
+    local _ttl="${5}"
+    local _token="${6}"
 
-    cat > "${_script}" <<__EOF__
-debug yes
-server ${_dns_server}
-zone ${_zone_name}
-update add _acme-challenge.${_zone_name} ${_ttl} TXT ${_token}
-send
-__EOF__
+    # The operation we are about to perform
+    local _operation=""
+    local _op_add="update add ${_fqdn} ${_ttl} TXT ${_token}"
+    local _op_delete="update delete ${_fqdn} TXT ${_token}"
+    case "${_op}" in
+	create)
+	    _operation="${_op_add}"
+	    ;;
+	delete)
+	    _operation="${_op_delete}"
+	    ;;
+	*)
+	    _usage
+	    ;;
+    esac
 
-    nsupdate -k "${_tsig_key}" -v "${_script}"
-    rm -f "${_script}"
-}
+    local _nameserver=""
+    local _script=$( mktemp nsupdate-script.XXXXXX )
 
-# Removes an ACME Challenge TXT record
-#
-# $1: Zone name
-# $2: Path to TSIG key
-# $3: TTL
-# $4: Token / Key
-function _delete_acme_challenge_record() {
-    local _zone_name="${1}"
-    local _tsig_key="${2}"
-    local _ttl="${3}"
-    local _token="${4}"
-    local _script=$( mktemp create-acme-challenge.XXXXXX )
+    # If $USE_NAMESERVER is specified forward queries to this
+    # nameserver, otherwise run the queries against the authoritative
+    # nameservers.
+    if [ ! -z "${USE_NAMESERVER}" ]; then
+	_nameserver="${USE_NAMESERVER}"
+    else
+	# Use the first authoritative DNS servers for the zone
+	local _nameserver=$( dig +short -t ns "${_zone_name}" | head -1 )
+    fi
 
-    # Use the first authoritative DNS servers for the zone
-    local _nameserver=$( dig +short "${_zone_name}" | head -1 )
-    if -z "${_nameserver}"; then
+    # We should have a nameserver in all cases
+    if [ -z "${_nameserver}" ]; then
 	echo "Unable to find authoritative DNS servers for ${_zone_name}"
 	exit 1
     fi
@@ -65,7 +77,7 @@ function _delete_acme_challenge_record() {
 debug yes
 server ${_nameserver}
 zone ${_zone_name}
-update delete _acme-challenge.${_zone_name} TXT ${_token}
+${_operation}
 send
 __EOF__
 
@@ -77,25 +89,16 @@ __EOF__
 function _main() {
     local _cmd="${1}"
     local _zone="${2}"
-    local _tsig_key="${3}"
-    local _ttl="${4}"
-    local _token="${5}"
+    local _fqdn="${3}"
+    local _tsig_key="${4}"
+    local _ttl="${5}"
+    local _token="${6}"
 
-    if [ $# -ne 5 ]; then
+    if [ $# -ne 6 ]; then
 	_usage
     fi
 
-    case "${_cmd}" in
-	create)
-	    _add_acme_challenge_record "${_zone}" "${_tsig_key}" "${_ttl}" "${_token}"
-	    ;;
-	delete)
-	    _delete_acme_challenge_record "${_zone}" "${_tsig_key}" "${_ttl}" "${_token}"
-	    ;;
-	*)
-	    _usage
-	    ;;
-    esac
+    _handle_acme_challenge "${_cmd}" "${_zone}" "${_fqdn}" "${_tsig_key}" "${_ttl}" "${_token}"
 }
 
 _main $*

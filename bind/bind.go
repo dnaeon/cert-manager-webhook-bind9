@@ -19,7 +19,6 @@ import (
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
@@ -106,13 +105,10 @@ func (b *BindProviderSolver) Name() string {
 // Present implements the webhook.Solver interface by creating the
 // respective TXT records
 func (b *BindProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
-	// TODO: Handle duplicate records
 	cfg, err := b.loadConfig(ch.Config, ch.ResourceNamespace)
 	if err != nil {
 		return err
 	}
-
-	klog.InfoS("Solving challenge", "dnsName", ch.DNSName, "resolvedZone", ch.ResolvedZone, "resolvedFQDN", ch.ResolvedFQDN)
 
 	// The zone must be in the list of zones we are allowing
 	zoneName := ch.ResolvedZone
@@ -130,7 +126,7 @@ func (b *BindProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 
 	// Call our helper script here to create the respective TXT
 	// records as part of the DNS-01 challenge
-	cmd := exec.Command(b.AcmeHelperScript, "create", zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
+	cmd := exec.Command(b.AcmeHelperScript, "create", zoneName, ch.ResolvedFQDN, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create TXT record %s: %s", ch.ResolvedFQDN, err)
 	}
@@ -145,8 +141,6 @@ func (b *BindProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	if err != nil {
 		return err
 	}
-
-	klog.InfoS("Deleting TXT record", "dnsName", ch.DNSName, "resolvedZone", ch.ResolvedZone, "resolvedFQDN", ch.ResolvedFQDN)
 
 	// The zone must be in the list of zones we are allowing
 	zoneName := ch.ResolvedZone
@@ -164,7 +158,7 @@ func (b *BindProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 
 	// Call our helper script here to delete the respective TXT
 	// record
-	cmd := exec.Command(b.AcmeHelperScript, "delete", zoneName, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
+	cmd := exec.Command(b.AcmeHelperScript, "delete", zoneName, ch.ResolvedFQDN, tsigFile.Name(), strconv.Itoa(cfg.TTL), ch.Key)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to delete TXT record %s: %s", ch.ResolvedFQDN, err)
 	}
