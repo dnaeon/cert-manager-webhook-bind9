@@ -109,7 +109,7 @@ Create a Docker network, which will be used by the test BIND service
 and our test suite.
 
 ``` bash
-docker network create webhook_test --help --subnet 172.16.0.0/24
+docker network create webhook_test --subnet 172.16.0.0/24
 ```
 
 Build and start the BIND service.
