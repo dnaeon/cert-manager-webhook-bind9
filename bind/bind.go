@@ -196,7 +196,7 @@ func (b *BindProviderSolver) loadConfig(cfgJSON *extapi.JSON, namespace string) 
 
 	// Validate the configuration and set sane defaults, if
 	// needed.
-	if cfg.TTL == 0 {
+	if cfg.TTL <= 0 {
 		cfg.TTL = DefaultTTL
 	}
 
