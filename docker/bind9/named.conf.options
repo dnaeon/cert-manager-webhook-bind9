@@ -2,6 +2,9 @@ options {
 	directory "/var/cache/bind";
 
 	recursion yes;
+	forwarders {
+            8.8.8.8; // Google
+	};
 
 	dnssec-validation false;
 
